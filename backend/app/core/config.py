@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     scheduler_interval_sec: int = 60
 
+    # Водяной знак (демо-режим) и шрифт субтитров
+    watermark: str = "Content Factory"
+    subtitle_font: str = "DejaVu Sans"
+
     # CORS (для dev-режима frontend на отдельном порту)
     cors_origins: str = "*"
 

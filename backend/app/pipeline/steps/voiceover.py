@@ -1,4 +1,4 @@
-"""Шаг 3: озвучка. edge-tts бесплатно; при ошибке — помечаем и продолжаем."""
+"""Шаг «Озвучка»: edge-tts (бесплатно) + тайминги слов для кинетических субтитров."""
 import logging
 from pathlib import Path
 
@@ -25,14 +25,18 @@ async def run(db: Session, job: Job, topic: Topic) -> None:
     data = dict(job.payload or {})
     try:
         if tts_name == "elevenlabs" and payload.get("api_key"):
-            raise NotImplementedError("ElevenLabs — этап 4")
+            raise NotImplementedError("ElevenLabs — этап 4 (Pro-тариф)")
         provider = EdgeTTS()
-        await provider.synthesize(script, topic.voice_id or payload.get("voice_id"), topic.language, voice_path)
-        data["voice_path"] = str(voice_path)
+        path, words = await provider.synthesize(
+            script, topic.voice_id or payload.get("voice_id"), topic.language, voice_path
+        )
+        data["voice_path"] = str(path)
         data["voice_note"] = "edge-tts"
-    except Exception as exc:  # нет сети/ffmpeg и т.п. — не валим пайплайн на этапе 0
+        data["word_timings"] = [{"text": w.text, "start": w.start, "end": w.end} for w in words]
+    except Exception as exc:  # нет сети / лимиты — не валим пайплайн, рендер соберёт без голоса
         logger.warning("Озвучка пропущена: %s", exc)
         data["voice_path"] = None
         data["voice_note"] = f"озвучка пропущена: {exc}"
+        data["word_timings"] = []
     job.payload = data
     db.commit()

@@ -29,3 +29,5 @@ media/
 .DS_Store
 Thumbs.db
 tools/keygen/public.b64
+tools/keygen/private.pem
+tools/keygen/public.b64

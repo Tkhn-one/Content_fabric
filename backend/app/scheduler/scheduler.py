@@ -28,13 +28,28 @@ def validate_cron(expr: str) -> bool:
 
 
 def _on_topic_tick(topic_id: int) -> None:
-    """Срабатывание расписания: создаём задание и запускаем пайплайн."""
+    """Срабатывание расписания: создаём задание и запускаем пайплайн
+    (с учётом лимита видео в день для темы)."""
+    from datetime import datetime, timezone
+
     from app.core.db import SessionLocal
 
     db = SessionLocal()
     try:
         topic = db.get(Topic, topic_id)
         if topic is None or not topic.enabled:
+            return
+        day_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_count = (
+            db.query(Job)
+            .filter(Job.topic_id == topic.id, Job.created_at >= day_start)
+            .count()
+        )
+        if today_count >= (topic.videos_per_day or 1):
+            logger.info(
+                "Тема %s: лимит %s видео/день исчерпан (%s сделано), пропускаем",
+                topic.name, topic.videos_per_day, today_count,
+            )
             return
         job = Job(topic_id=topic.id)
         db.add(job)

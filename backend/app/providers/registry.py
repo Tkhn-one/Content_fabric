@@ -85,6 +85,18 @@ PROVIDERS: list[tuple[str, str, dict]] = [
          "url": "developers.facebook.com", "free": True,
          "fields": ["access_token", "user_id"]},
     ),
+    (
+        "storage", "google_sheets",
+        {"description": "Журнал публикаций в Google Sheets (service account)",
+         "url": "console.cloud.google.com", "free": True,
+         "fields": ["service_account_json", "spreadsheet_id"]},
+    ),
+    (
+        "storage", "google_drive",
+        {"description": "Архив готовых роликов в Google Drive (service account)",
+         "url": "console.cloud.google.com", "free": True,
+         "fields": ["service_account_json", "folder_id"]},
+    ),
 ]
 
 DEFAULT_BY_TYPE = {"llm": "mock", "tts": "edge_tts", "stock": "picsum"}
@@ -105,3 +117,19 @@ def get_provider_settings(db: Session, ptype: str, default_name: str | None = No
     rows.sort(key=lambda r: (not r.is_default, -r.id))
     row = rows[0]
     return row.provider_name, decrypt_secrets(row.encrypted_payload)
+
+
+def get_provider_settings_named(db: Session, ptype: str, provider_name: str) -> dict | None:
+    """Настройки конкретного провайдера (например, publish + youtube)."""
+    row = (
+        db.query(ProviderSettings)
+        .filter(
+            ProviderSettings.provider_type == ptype,
+            ProviderSettings.provider_name == provider_name,
+            ProviderSettings.is_enabled.is_(True),
+        )
+        .first()
+    )
+    if row is None:
+        return None
+    return {"provider_name": row.provider_name, "payload": decrypt_secrets(row.encrypted_payload)}

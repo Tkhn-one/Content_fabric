@@ -70,10 +70,14 @@ export default function Jobs() {
         <div className="card">
           <h2>Задание #{detail.id} — {detail.status}</h2>
           {detail.error && <div className="error">{detail.error}</div>}
+          <p className="muted small">
+            {detail.payload?.voice_note && <>🎙 {detail.payload.voice_note}<br /></>}
+            {detail.payload?.video_note && <>🎞 {detail.payload.video_note}</>}
+          </p>
           <h3>Сценарий</h3>
           <pre className="script">{detail.payload?.script || "—"}</pre>
           {detail.payload?.video_path && (
-            <p>🎞 <a href={`/media/${detail.payload.video_path.split("/").slice(-3).join("/")}`} target="_blank" rel="noreferrer">Смотреть ролик</a></p>
+            <p>🎬 <a href={`/media/${detail.payload.video_path.split("/").slice(-3).join("/")}`} target="_blank" rel="noreferrer">Смотреть ролик</a> ({detail.payload.video_duration} сек)</p>
           )}
           <h3>Публикации</h3>
           <ul>
