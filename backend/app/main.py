@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import auth, jobs, publish, settings as settings_api, topics
+from app.api import auth, jobs, publish, settings as settings_api, stats as stats_api, topics
 from app.core.config import settings
 from app.core.db import SessionLocal, init_db
 from app.core.security import hash_password
@@ -65,6 +65,7 @@ app.include_router(topics.router)
 app.include_router(jobs.router)
 app.include_router(settings_api.router)
 app.include_router(publish.router)
+app.include_router(stats_api.router)
 
 
 @app.get("/api/health")

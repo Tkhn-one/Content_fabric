@@ -3,11 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.license import parse_license
+from app.core.license import TIERS, parse_license
 from app.core.security import decrypt_secrets, encrypt_secrets
 from app.models import LicenseKey, ProviderSettings, SystemSetting, User
 from app.providers.registry import PROVIDERS  # справочник доступных провайдеров
-from app.schemas.settings import LicenseActivate, ProviderOut, ProviderSave
+from app.schemas.settings import LicenseActivate, ProviderOut, ProviderSave, ResellerKeyRequest
 
 from .deps import get_current_user
 
@@ -124,6 +124,46 @@ def get_branding(db: Session = Depends(get_db), user: User = Depends(get_current
         "app_name": _get_setting(db, "app_name") or "Content Factory",
         "logo_url": _get_setting(db, "logo_url") or "",
     }
+
+
+@router.post("/license/reseller/generate")
+def generate_reseller_key(body: ResellerKeyRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Unlimited: выпуск лицензий для перепродажи (нужен CF_RESELLER_PRIVATE_KEY)."""
+    from datetime import date
+
+    import base64
+    import json
+
+    from app.core.config import settings as app_settings
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    if not app_settings.reseller_private_key:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Генерация лицензий недоступна: не задан CF_RESELLER_PRIVATE_KEY",
+        )
+    if body.tier not in TIERS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Тариф: {', '.join(TIERS)}")
+
+    try:
+        priv = serialization.load_pem_private_key(app_settings.reseller_private_key.encode(), password=None)
+        assert isinstance(priv, Ed25519PrivateKey)
+    except Exception:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Невалидный CF_RESELLER_PRIVATE_KEY")
+
+    features = body.features if body.features is not None else TIERS[body.tier]["features"]
+    payload = {
+        "tier": body.tier,
+        "features": features,
+        "channels": max(1, body.channels),
+        "customer": body.customer,
+        "support_until": body.support_until or date.today().replace(year=date.today().year + 1).isoformat(),
+        "issued": date.today().isoformat(),
+    }
+    payload_b64 = base64.b64encode(json.dumps(payload).encode()).decode()
+    sig = base64.b64encode(priv.sign(payload_b64.encode())).decode()
+    return {"key": f"{payload_b64}.{sig}", "payload": payload}
 
 
 @router.put("/branding")

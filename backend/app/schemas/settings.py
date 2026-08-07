@@ -26,3 +26,12 @@ class ProviderOut(BaseModel):
 
 class LicenseActivate(BaseModel):
     key: str
+
+
+class ResellerKeyRequest(BaseModel):
+    tier: str = "pro"
+    channels: int = 1
+    customer: str = ""
+    support_until: str = ""
+    features: list[str] | None = None
+

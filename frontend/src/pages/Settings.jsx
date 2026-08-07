@@ -9,6 +9,8 @@ export default function Settings() {
   const [form, setForm] = useState({ provider_type: "llm", provider_name: "", label: "", payload: {}, is_default: false });
   const [msg, setMsg] = useState("");
   const [brand, setBrand] = useState({ app_name: "", logo_url: "" });
+  const [reseller, setReseller] = useState({ tier: "pro", channels: 1, customer: "", support_until: "" });
+  const [resellerKey, setResellerKey] = useState("");
 
   const load = () => {
     api.get("/settings/providers/catalog").then((r) => setCatalog(r.data)).catch(() => {});
@@ -49,6 +51,17 @@ export default function Settings() {
       setMsg("Брендинг сохранён ✓");
     } catch (err) {
       setMsg(err.response?.data?.detail || "Ошибка");
+    }
+  };
+
+  const genResellerKey = async () => {
+    setResellerKey("");
+    try {
+      const { data } = await api.post("/settings/license/reseller/generate", reseller);
+      setResellerKey(data.key);
+      setMsg(`Ключ выпущен (${data.payload.tier}, каналов: ${data.payload.channels}) ✓`);
+    } catch (err) {
+      setMsg(err.response?.data?.detail || "Ошибка генерации ключа");
     }
   };
 
@@ -108,6 +121,36 @@ export default function Settings() {
           {msg && <div className="error">{msg}</div>}
           <div><button type="submit" className="btn primary">Сохранить подключение</button></div>
         </form>
+      </div>
+
+      <div className="card">
+        <h2>Выпуск лицензий (Reseller, Unlimited)</h2>
+        <p className="muted small">Генерация ключей для ваших клиентов (перепродажа). Работает, если администратор задал CF_RESELLER_PRIVATE_KEY.</p>
+        <div className="form-grid">
+          <label>Тариф
+            <select value={reseller.tier} onChange={(e) => setReseller({ ...reseller, tier: e.target.value })}>
+              <option value="basic">Basic</option>
+              <option value="pro">Pro</option>
+              <option value="unlimited">Unlimited</option>
+            </select>
+          </label>
+          <label>Каналов
+            <input type="number" min="1" max="50" value={reseller.channels} onChange={(e) => setReseller({ ...reseller, channels: +e.target.value })} />
+          </label>
+          <label>Клиент
+            <input value={reseller.customer} onChange={(e) => setReseller({ ...reseller, customer: e.target.value })} placeholder="Имя клиента" />
+          </label>
+          <label>Поддержка до (ГГГГ-ММ-ДД)
+            <input value={reseller.support_until} onChange={(e) => setReseller({ ...reseller, support_until: e.target.value })} placeholder="2027-12-31" />
+          </label>
+        </div>
+        <button className="btn primary" onClick={genResellerKey}>Выпустить ключ</button>
+        {resellerKey && (
+          <div className="row" style={{ marginTop: ".6rem" }}>
+            <input readOnly value={resellerKey} className="grow mono" onFocus={(e) => e.target.select()} />
+            <button className="btn small" onClick={() => { navigator.clipboard?.writeText(resellerKey); setMsg("Ключ скопирован ✓"); }}>Копировать</button>
+          </div>
+        )}
       </div>
 
       <div className="card">

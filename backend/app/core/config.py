@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     license_required: bool = False
     demo_mode: bool = True
 
+    # Reseller: приватный ключ для выпуска лицензий внутри панели (Unlimited)
+    reseller_private_key: str | None = None
+
     # Планировщик
     scheduler_enabled: bool = True
     scheduler_interval_sec: int = 60

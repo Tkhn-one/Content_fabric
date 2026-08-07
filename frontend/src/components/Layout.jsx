@@ -23,6 +23,7 @@ export default function Layout() {
     { to: "/topics", label: "Темы и расписание" },
     { to: "/jobs", label: "Задания" },
     { to: "/log", label: "Журнал публикаций" },
+    { to: "/analytics", label: "Аналитика" },
     { to: "/settings", label: "Подключения и API" },
   ];
 

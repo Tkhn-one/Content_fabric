@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
+import Analytics from "./pages/Analytics.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Jobs from "./pages/Jobs.jsx";
 import Login from "./pages/Login.jsx";
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="topics" element={<Topics />} />
         <Route path="jobs" element={<Jobs />} />
         <Route path="log" element={<Log />} />
+        <Route path="analytics" element={<Analytics />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>
