@@ -1,0 +1,111 @@
+"""Настройки: подключение API-провайдеров (мастер), лицензия, статус системы."""
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.db import get_db
+from app.core.license import parse_license
+from app.core.security import decrypt_secrets, encrypt_secrets
+from app.models import LicenseKey, ProviderSettings, User
+from app.providers.registry import PROVIDERS  # справочник доступных провайдеров
+from app.schemas.settings import LicenseActivate, ProviderOut, ProviderSave
+
+from .deps import get_current_user
+
+router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+
+@router.get("/providers/catalog")
+def provider_catalog(user: User = Depends(get_current_user)):
+    """Справочник: какие провайдеры поддерживаются и зачем (для мастера настройки)."""
+    return [
+        {
+            "type": ptype,
+            "name": name,
+            "description": meta.get("description", ""),
+            "url": meta.get("url", ""),
+            "free": meta.get("free", False),
+            "fields": meta.get("fields", []),
+        }
+        for ptype, name, meta in PROVIDERS
+    ]
+
+
+@router.get("/providers", response_model=list[ProviderOut])
+def list_providers(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    rows = db.query(ProviderSettings).order_by(ProviderSettings.provider_type).all()
+    out = []
+    for r in rows:
+        o = ProviderOut.model_validate(r)
+        payload = decrypt_secrets(r.encrypted_payload)
+        o.label = r.label or (payload.get("note", "") if payload else "")
+        out.append(o)
+    return out
+
+
+@router.post("/providers", response_model=ProviderOut)
+def save_provider(
+    body: ProviderSave,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if body.provider_type not in {p[0] for p in PROVIDERS}:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Неизвестный тип провайдера")
+    row = (
+        db.query(ProviderSettings)
+        .filter(
+            ProviderSettings.provider_type == body.provider_type,
+            ProviderSettings.provider_name == body.provider_name,
+        )
+        .first()
+    )
+    if row is None:
+        row = ProviderSettings(provider_type=body.provider_type, provider_name=body.provider_name)
+        db.add(row)
+    row.encrypted_payload = encrypt_secrets(body.payload)
+    row.is_enabled = bool(body.payload.get("api_key") or body.payload.get("enabled"))
+    row.is_default = body.is_default
+    row.label = body.label
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.delete("/providers/{provider_id}")
+def delete_provider(provider_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    row = db.get(ProviderSettings, provider_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Провайдер не найден")
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
+
+
+# --- Лицензия -------------------------------------------------------------
+@router.get("/license")
+def get_license_status(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    row = db.query(LicenseKey).first()
+    info = parse_license(row.key if row else "")
+    return {
+        "valid": info.valid,
+        "demo": info.demo,
+        "tier": info.tier,
+        "channels": info.channels,
+        "customer": info.customer,
+        "support_until": info.support_until,
+        "key": row.key if row else "",
+    }
+
+
+@router.post("/license")
+def activate_license(body: LicenseActivate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    info = parse_license(body.key)
+    if not info.valid:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Ключ недействителен")
+    row = db.query(LicenseKey).first()
+    if row is None:
+        row = LicenseKey(key=body.key)
+        db.add(row)
+    else:
+        row.key = body.key
+    db.commit()
+    return {"valid": True, "tier": info.tier, "channels": info.channels, "demo": info.demo}
