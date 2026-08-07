@@ -82,3 +82,22 @@ class YouTubePublisher:
             url = f"https://www.youtube.com/shorts/{video_id}" if video_id else ""
 
         return {"external_id": video_id, "url": url, "raw": {"status": "published"}}
+
+    async def set_thumbnail(self, video_id: str, cover_path: Path) -> bool:
+        """Загрузка обложки (scope youtube.thumbnails). Тихий отказ при отсутствии прав."""
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                token = await self._access_token(client)
+                url = f"https://www.googleapis.com/upload/youtube/v3/thumbnails/set"
+                with open(cover_path, "rb") as f:
+                    resp = await client.post(
+                        url,
+                        params={"videoId": video_id},
+                        headers={"Authorization": f"Bearer {token}"},
+                        files={"media": (cover_path.name, f, "image/jpeg")},
+                    )
+                if resp.status_code in (200, 201):
+                    return True
+        except Exception:
+            pass
+        return False

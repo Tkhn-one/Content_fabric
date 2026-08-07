@@ -15,6 +15,7 @@ const TEMPLATES = [
   { id: "story", label: "История" },
   { id: "qa", label: "Вопрос-ответ" },
   { id: "myth", label: "Разрушение мифа" },
+  { id: "chat", label: "💬 Фейк-чат (переписка)" },
 ];
 
 const empty = {

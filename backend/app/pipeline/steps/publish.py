@@ -62,6 +62,17 @@ async def _publish_real(db: Session, platform: str, job: Job, topic: Topic, vide
             payload.get("channel_id", ""),
         )
         res = await pub.publish(video, _meta(topic, job, platform, hashtags))
+        # обложка (генерируется локально, без ключей)
+        if res.get("external_id") and video.parent:
+            try:
+                from app.services.cover import generate_cover
+
+                cover = video.parent / "cover.jpg"
+                title = (job.payload or {}).get("title") or topic.name
+                generate_cover(title, topic.niche, cover, seed=job.id % 4)
+                await pub.set_thumbnail(res["external_id"], cover)
+            except Exception as exc:
+                logger.warning("Обложка не загружена: %s", exc)
         return {"external_id": res["external_id"], "url": res["url"]}
 
     if platform == "tiktok":

@@ -54,9 +54,52 @@ def _pick_facts(topic: Topic, n: int) -> list[str]:
     return facts
 
 
+async def _build_dialogue(db: Session, job: Job, topic: Topic) -> None:
+    """Генерирует диалог для формата «фейк-чат» (mock; с LLM — реальный на этапе финализации)."""
+    is_en = (topic.language or "ru").lower().startswith("en")
+    niche = topic.niche
+
+    # реплики строятся вокруг фактов из пула
+    facts = _pick_facts(topic, 3)
+    if is_en:
+        lines = [
+            (0, f"Hey, did you know something wild about {niche}?"),
+            (1, "What? Tell me!"),
+            (0, facts[0] if facts else "It's really interesting."),
+            (1, "Wait, that can't be true…"),
+            (0, facts[1] if len(facts) > 1 else "It is! Check it yourself."),
+            (1, "Okay, I need to learn more about this."),
+        ]
+    else:
+        lines = [
+            (0, f"Слышал, есть кое-что дикое про {niche}?"),
+            (1, "Что? Рассказывай!"),
+            (0, facts[0] if facts else "Это реально интересно."),
+            (1, "Стоп, такого не может быть…"),
+            (0, facts[1] if len(facts) > 1 else "Может! Проверь сам."),
+            (1, "Ладно, надо узнать об этом больше."),
+        ]
+
+    dialogue = [{"speaker": sp, "text": tx} for sp, tx in lines]
+    script = " ".join(tx for _, tx in lines)
+
+    payload_data = dict(job.payload or {})
+    payload_data["script"] = script
+    payload_data["title"] = (get_templates(topic.language)["chat"]["title"]).format(niche=niche)
+    payload_data["dialogue"] = dialogue
+    payload_data["prompt"] = f"Диалог на тему {niche} ({len(dialogue)} реплик)"
+    job.payload = payload_data
+    db.commit()
+
+
 async def run(db: Session, job: Job, topic: Topic) -> None:
     templates = get_templates(topic.language)
     tpl = templates.get(topic.template, templates["facts"])
+
+    # --- Формат «фейк-чат»: строим диалог ---
+    if topic.template == "chat":
+        return await _build_dialogue(db, job, topic)
+
     facts = _pick_facts(topic, tpl["n"])
     prompt = render_prompt(topic.template, topic.niche, topic.tone, topic.language, facts)
 

@@ -15,6 +15,21 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from .config import settings
 
+DEMO_MAX_VIDEOS = 3  # лимит роликов в демо-режиме
+
+
+def demo_limit_reached(db) -> bool:
+    """True, если демо-режим и лимит роликов исчерпан."""
+    from app.models import LicenseKey, PublishLog
+
+    row = db.query(LicenseKey).first()
+    info = parse_license(row.key if row else "")
+    if not info.demo:
+        return False
+    published = db.query(PublishLog).filter(PublishLog.status == "published").count()
+    return published >= DEMO_MAX_VIDEOS
+
+
 TIERS = {
     "basic": {
         "features": [

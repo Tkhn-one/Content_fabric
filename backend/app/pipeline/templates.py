@@ -36,6 +36,13 @@ TEMPLATES: dict[str, dict] = {
         "cta": "А во что верил ты? Расскажи в комментариях!",
         "n": 3,
     },
+    "chat": {
+        "title": "Переписка про {niche}",
+        "hook": "Диалог, который взорвал сеть.",
+        "body": "Переписка двух людей о {niche}, где каждый обменивается фактами.",
+        "cta": "Подпишись, чтобы видеть такие диалоги!",
+        "n": 3,
+    },
 }
 
 TEMPLATES_EN: dict[str, dict] = {
@@ -72,6 +79,13 @@ TEMPLATES_EN: dict[str, dict] = {
         "hook": "Everyone believes this myth about {niche}. But the truth is different.",
         "body": "The myth: {fact}. In reality: {fact}. Scientists say: {fact}.",
         "cta": "What did you believe? Tell us in the comments!",
+        "n": 3,
+    },
+    "chat": {
+        "title": "Chat about {niche}",
+        "hook": "A conversation that blew up the internet.",
+        "body": "Two people chatting about {niche}, swapping facts.",
+        "cta": "Subscribe to see more conversations like this!",
         "n": 3,
     },
 }

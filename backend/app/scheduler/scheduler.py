@@ -34,10 +34,15 @@ def _on_topic_tick(topic_id: int) -> None:
 
     from app.core.db import SessionLocal
 
+    from app.core.license import demo_limit_reached
+
     db = SessionLocal()
     try:
         topic = db.get(Topic, topic_id)
         if topic is None or not topic.enabled:
+            return
+        if demo_limit_reached(db):
+            logger.info("Демо-режим: лимит роликов исчерпан, задание не создано")
             return
         day_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         today_count = (

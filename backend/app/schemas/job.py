@@ -9,6 +9,9 @@ class JobCreate(BaseModel):
     topic_id: int | None = None
     niche: str | None = None          # разовый запуск без сохранения темы
     name: str | None = None
+    language: str = "ru"
+    tone: str = "casual"
+    template: str = "facts"
     platforms: list[str] = []
     auto_publish: bool = False
 

@@ -178,6 +178,79 @@ def _finalize(video: Path, audio: Path, ass_path: Path, out: Path) -> None:
         raise RuntimeError(f"ffmpeg finalize: {res.stderr[-500:]}")
 
 
+async def _render_chat(job: Job, data: dict, job_dir: Path, db: Session, voice_path: Path | None) -> None:
+    """Фейк-чат: каждый кадр — скриншот мессенджера с накопленными сообщениями.
+
+    Длительность кадра = длительность озвучки реплики (из dialogue_timings).
+    Без озвучки — равномерно по числу реплик.
+    """
+    dialogue = data.get("dialogue", [])
+    if not dialogue:
+        raise RuntimeError("Нет диалога")
+
+    demo, watermark = _is_demo(db)
+    timings = data.get("dialogue_timings") or []
+    if not timings or len(timings) != len(dialogue):
+        total_est = max(8.0, sum(len(r["text"]) for r in dialogue) / 13.0)
+        per = total_est / len(dialogue)
+        timings = [
+            {"start": round(i * per, 2), "end": round((i + 1) * per, 2),
+             "speaker": r["speaker"], "text": r["text"]}
+            for i, r in enumerate(dialogue)
+        ]
+
+    from app.services.chat_render import render_chat_screenshot
+
+    clips: list[Path] = []
+    for i, (rep, tm) in enumerate(zip(dialogue, timings)):
+        shot = job_dir / f"chat_{i:02d}.png"
+        render_chat_screenshot(dialogue[: i + 1], shot, brand=watermark if demo else "Content Factory")
+        dur = max(1.2, min(10.0, (tm["end"] - tm["start"])))
+        frames = max(1, int(dur * FPS))
+        seg = job_dir / f"chatseg_{i:02d}.mp4"
+        exe = ffmpeg_path()
+        res = subprocess.run(
+            [
+                exe, "-y", "-i", str(shot),
+                "-vf", (
+                    f"scale={W}:{H}:force_original_aspect_ratio=increase,"
+                    f"crop={W}:{H},"
+                    f"zoompan=z='min(zoom+0.0006,1.08)':d={frames}:s={W}x{H}:fps={FPS},"
+                    f"format=yuv420p"
+                ),
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-r", str(FPS),
+                str(seg),
+            ],
+            capture_output=True, text=True, timeout=180,
+        )
+        if res.returncode != 0:
+            raise RuntimeError(f"ffmpeg chat seg: {res.stderr[-400:]}")
+        clips.append(seg)
+
+    silent = job_dir / "silent.mp4"
+    _concat_segments(clips, silent)
+    total = probe_duration(silent) or sum(len(c) for c in clips)
+
+    music = _pick_music()
+    audio = job_dir / "audio.m4a"
+    _mix_audio(voice_path, music, total, audio)
+
+    # субтитры не нужны (текст на экране); водяной знак — стилем Watermark
+    from app.services.subtitles import build_ass
+
+    ass_path = job_dir / "subs.ass"
+    ass_path.write_text(build_ass([], total, watermark=watermark if demo else None), encoding="utf-8")
+
+    out_video = job_dir / "video.mp4"
+    _finalize(silent, audio, ass_path, out_video)
+
+    data["video_path"] = str(out_video)
+    data["video_duration"] = round(probe_duration(out_video), 1)
+    data["video_note"] = f"формат: фейк-чат ({len(dialogue)} реплик), музыка: {'да' if music else 'нет'}"
+    job.payload = data
+    db.commit()
+
+
 def _pick_music() -> Path | None:
     music_dir = settings.media_dir / "music"
     if not music_dir.exists():
@@ -272,6 +345,10 @@ async def run(db: Session, job: Job, topic: Topic) -> None:
 
     if avatar_path and avatar_path.exists():
         return await _render_avatar(job, data, avatar_path, job_dir, db)
+
+    # формат «фейк-чат»: скриншоты мессенджера вместо фоновых сегментов
+    if data.get("dialogue"):
+        return await _render_chat(job, data, job_dir, db, voice_path)
 
     if not words:
         dur = probe_duration(voice_path) if voice_path else max(8.0, len(script) / 13.0)

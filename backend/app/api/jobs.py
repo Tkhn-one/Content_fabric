@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.license import demo_limit_reached
 from app.models import Job, Topic, User
 from app.pipeline.engine import PipelineEngine
 from app.schemas.job import JobCreate, JobOut
@@ -16,6 +17,11 @@ engine = PipelineEngine()
 @router.post("", response_model=JobOut)
 async def create_job(body: JobCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Ручной режим: нажали — получили видео (задание уходит в очередь)."""
+    if demo_limit_reached(db):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"Демо-режим: лимит {3} роликов. Активируйте лицензию в Подключениях.",
+        )
     topic = None
     if body.topic_id:
         topic = db.get(Topic, body.topic_id)
@@ -29,6 +35,9 @@ async def create_job(body: JobCreate, db: Session = Depends(get_db), user: User 
             user_id=user.id,
             name=body.name or niche,
             niche=niche,
+            language=body.language,
+            tone=body.tone,
+            template=body.template,
             platforms=body.platforms or [],
             auto_publish=body.auto_publish,
         )
