@@ -36,12 +36,12 @@ PROVIDERS: list[tuple[str, str, dict]] = [
     ),
     (
         "avatar", "heygen",
-        {"description": "AI-аватар, говорящий по сценарию (Pro+)", "url": "heygen.com",
-         "free": False, "fields": ["api_key", "avatar_id"]},
+        {"description": "HeyGen: AI-аватар, читающий сценарий (Pro+)", "url": "heygen.com",
+         "free": False, "fields": ["api_key", "avatar_id", "voice_id"]},
     ),
     (
         "avatar", "did",
-        {"description": "D-ID AI-аватар (Pro+)", "url": "d-id.com",
+        {"description": "D-ID: AI-аватар (Pro+, подключится позже)", "url": "d-id.com",
          "free": False, "fields": ["api_key", "avatar_id"]},
     ),
     (
@@ -72,7 +72,7 @@ PROVIDERS: list[tuple[str, str, dict]] = [
         "publish", "tiktok",
         {"description": "TikTok Content Posting API (нужна модерация приложения)",
          "url": "developers.tiktok.com", "free": True,
-         "fields": ["client_key", "client_secret", "access_token"]},
+         "fields": ["client_key", "client_secret", "access_token", "refresh_token"]},
     ),
     (
         "publish", "vk",
@@ -81,9 +81,14 @@ PROVIDERS: list[tuple[str, str, dict]] = [
     ),
     (
         "publish", "instagram",
-        {"description": "Instagram Graph API — Reels (Business-аккаунт)",
+        {"description": "Instagram Graph API — Reels (Business-аккаунт, нужен публичный server_url)",
          "url": "developers.facebook.com", "free": True,
-         "fields": ["access_token", "user_id"]},
+         "fields": ["access_token", "user_id", "server_url"]},
+    ),
+    (
+        "avatar", "heygen",
+        {"description": "HeyGen: AI-аватар, читающий сценарий (Pro+)", "url": "heygen.com",
+         "free": False, "fields": ["api_key", "avatar_id", "voice_id"]},
     ),
     (
         "storage", "google_sheets",

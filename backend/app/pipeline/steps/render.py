@@ -188,6 +188,67 @@ def _pick_music() -> Path | None:
     return random.choice(tracks)
 
 
+async def _render_avatar(job: Job, data: dict, avatar_path: Path, job_dir: Path, db: Session) -> None:
+    """Режим аватара: видео аватара 9:16 + субтитры + музыка с ducking + водяной знак."""
+    script = data.get("script", "")
+    exe = ffmpeg_path()
+
+    # 1) основа: обрезать аватар под 1080x1920, без звука
+    base = job_dir / "avatar_base.mp4"
+    res = subprocess.run(
+        [
+            exe, "-y", "-i", str(avatar_path),
+            "-vf", (
+                f"scale={W}:{H}:force_original_aspect_ratio=increase,"
+                f"crop={W}:{H},format=yuv420p"
+            ),
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-an", str(base),
+        ],
+        capture_output=True, text=True, timeout=300,
+    )
+    if res.returncode != 0:
+        raise RuntimeError(f"ffmpeg avatar base: {res.stderr[-400:]}")
+    total = probe_duration(base) or 0
+
+    # 2) голос аватара — из его аудиодорожки
+    voice_av = job_dir / "avatar_voice.m4a"
+    res = subprocess.run(
+        [exe, "-y", "-i", str(avatar_path), "-vn", "-c:a", "aac", str(voice_av)],
+        capture_output=True, text=True, timeout=120,
+    )
+    if res.returncode != 0 or not voice_av.exists():
+        voice_av = None
+
+    # 3) тайминги слов: нет реальных — оцениваем по длительности
+    words: list[Word] = [Word(w["text"], w["start"], w["end"]) for w in data.get("word_timings", [])]
+    if not words:
+        words = estimate_word_timings(script, total)
+    phrases = split_phrases(script, SEGMENT_MAX_LEN)
+    grouped = group_words_by_phrases(script, words, SEGMENT_MAX_LEN)
+    if not grouped:
+        grouped = [(p, []) for p in phrases]
+
+    # 4) музыка с ducking
+    music = _pick_music()
+    audio = job_dir / "audio.m4a"
+    _mix_audio(voice_av, music, total, audio)
+
+    # 5) субтитры + водяной знак
+    demo, watermark = _is_demo(db)
+    ass_path = job_dir / "subs.ass"
+    ass_path.write_text(build_ass(grouped, total, watermark=watermark if demo else None), encoding="utf-8")
+
+    out_video = job_dir / "video.mp4"
+    _finalize(base, audio, ass_path, out_video)
+
+    data["video_path"] = str(out_video)
+    data["video_duration"] = round(probe_duration(out_video), 1)
+    data["video_note"] = f"аватар: {data.get('avatar_note', 'heygen')}, музыка: {'да' if music else 'нет'}"
+    job.payload = data
+    db.commit()
+
+
 async def run(db: Session, job: Job, topic: Topic) -> None:
     data = dict(job.payload or {})
     script = data.get("script", "")
@@ -207,6 +268,11 @@ async def run(db: Session, job: Job, topic: Topic) -> None:
     # --- тайминги слов ---
     words: list[Word] = [Word(w["text"], w["start"], w["end"]) for w in data.get("word_timings", [])]
     voice_path = Path(data["voice_path"]) if data.get("voice_path") else None
+    avatar_path = Path(data["avatar_path"]) if data.get("avatar_path") else None
+
+    if avatar_path and avatar_path.exists():
+        return await _render_avatar(job, data, avatar_path, job_dir, db)
+
     if not words:
         dur = probe_duration(voice_path) if voice_path else max(8.0, len(script) / 13.0)
         words = estimate_word_timings(script, dur)

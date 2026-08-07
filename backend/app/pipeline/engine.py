@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
 from app.models import Job
+from app.pipeline.steps import avatar as step_avatar
 from app.pipeline.steps import publish as step_publish
 from app.pipeline.steps import render as step_render
 from app.pipeline.steps import research as step_research
@@ -25,6 +26,7 @@ STEPS = [
     ("research", step_research.run),
     ("script", step_script.run),
     ("voiceover", step_voiceover.run),
+    ("avatar", step_avatar.run),   # Pro+: говорящий аватар (опционально)
     ("render", step_render.run),
 ]
 MAX_RETRIES = 2

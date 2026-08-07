@@ -59,16 +59,17 @@ def test_full_flow():
         assert data["status"] == "review", data
         assert data["payload"].get("script"), "сценарий должен быть сгенерирован"
 
-        # модерация → публикация
+        # модерация → публикация (ключи платформ не настроены → статусы skipped)
         r = client.post(f"/api/jobs/{job_id}/approve", headers=headers)
         assert r.status_code == 200, r.text
         data = _wait_status(client, headers, job_id, {"done"})
         assert len(data["publish_logs"]) == 2, data["publish_logs"]
+        assert all(p["status"] == "skipped" for p in data["publish_logs"]), data["publish_logs"]
 
         # журнал
         r = client.get("/api/publish/log", headers=headers)
         assert r.status_code == 200
-        assert any(row["status"] == "published" for row in r.json())
+        assert len(r.json()) >= 2
 
         # авто-режим (без модерации)
         r = client.post(

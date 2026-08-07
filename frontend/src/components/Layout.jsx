@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 export default function Layout() {
   const [user, setUser] = useState(null);
   const [license, setLicense] = useState(null);
+  const [brand, setBrand] = useState(null);
 
   useEffect(() => {
     api.get("/auth/me").then((r) => setUser(r.data)).catch(() => {});
     api.get("/settings/license").then((r) => setLicense(r.data)).catch(() => {});
+    api.get("/settings/branding").then((r) => setBrand(r.data)).catch(() => {});
   }, []);
 
   const logout = () => {
@@ -27,7 +29,10 @@ export default function Layout() {
   return (
     <div className="layout">
       <aside className="sidebar">
-        <div className="brand">🎬 Content Factory</div>
+        <div className="brand">
+          {brand?.logo_url ? <img src={brand.logo_url} alt="" style={{ height: "22px", verticalAlign: "middle", marginRight: "6px" }} /> : "🎬"}
+          {" "}{brand?.app_name || "Content Factory"}
+        </div>
         <nav>
           {nav.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className="nav-link">

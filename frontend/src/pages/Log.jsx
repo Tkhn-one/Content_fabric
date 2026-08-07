@@ -20,7 +20,10 @@ export default function Log() {
                 <td>#{r.id}</td>
                 <td>#{r.job_id}</td>
                 <td>{r.platform}</td>
-                <td><b>{r.status}</b></td>
+                <td>
+                  <b>{r.status}</b>
+                  {r.stats?.note && <div className="muted small">{r.stats.note}</div>}
+                </td>
                 <td className="small">{r.url || "—"}</td>
                 <td className="muted">{r.published_at?.slice(0, 19).replace("T", " ") || "—"}</td>
               </tr>

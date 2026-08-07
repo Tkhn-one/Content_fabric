@@ -152,11 +152,50 @@ CF_SECRET_KEY=dev ../.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ---
 
-## Шаг 6 (Pro). Клон голоса и AI-аватар — появятся на этапе 4
+## Шаг 6 (Pro). Клон голоса и AI-аватар
 
-Заглушки уже стоят. Когда дойдём до этапа 4, потребуется (опционально):
-- **ElevenLabs** — https://elevenlabs.io → API key (+ `voice_id`; клон голоса — в разделе Voice Lab).
-- **HeyGen** — https://heygen.com → API key (+ `avatar_id`) — для говорящего аватара.
+Реализованы, ждут ключей (Pro-тариф).
+
+### 6.1. ElevenLabs (качественный голос / клон голоса)
+1. https://elevenlabs.io → регистрация → **Profile → API key** → скопировать.
+2. Голос: в разделе **Voice Lab** → Create a new voice (или Instant Voice Cloning — загрузите
+   образец голоса 1–3 мин) → получите `voice_id` (строка вида `21m00...`).
+3. Панель: **Подключения → tts → elevenlabs** → `api_key` (+ при желании `voice_id` по умолчанию) → Сохранить.
+4. В теме можно указать свой `voice_id` (поле «Голос») — он перекроет дефолтный.
+
+### 6.2. HeyGen (говорящий AI-аватар)
+1. https://heygen.com → регистрация → **API** → **API token** (или в настройках аккаунта) → ключ.
+2. Аватар: в редакторе HeyGen выберите аватара → в URL/настройках найдите его `avatar_id`
+   (например `Chris_public_...`) или возьмите из **Avatars API** (GET /v2/avatars).
+3. Панель: **Подключения → avatar → heygen** → `api_key` (+ `avatar_id` по умолчанию) → Сохранить.
+4. В теме укажите `avatar_id` (поле «AI-аватар») — ролик будет с говорящим аватаром.
+   Голос аватара — из HeyGen (можно передать `voice_id` в настройках провайдера).
+
+## Шаг 7 (Pro/Unlimited). TikTok, VK, Instagram Reels
+
+Реализованы, ждут ключей.
+
+### 7.1. TikTok (Pro+)
+1. https://developers.tiktok.com → создать приложение → запросить scopes `video.publish`, `video.upload`
+   (модерация приложения 3–7 дней; нужны privacy policy, демо-видео, описание).
+2. После одобрения: получить `client_key` (app key), `client_secret`, и через OAuth — `access_token`
+   + `refresh_token` (токены живут 24 ч, система обновляет их сама по refresh_token).
+3. Панель: **Подключения → publish → tiktok** → заполнить 4 поля → Сохранить.
+
+### 7.2. VK Clips (Unlimited)
+1. https://vk.com/dev → создать приложение → включить права `video`, `wall`, `photos`.
+2. Получить **токен сообщества**: https://vk.com/dev/access_token → «Токен сообщества»
+   (выберите сообщество, права video+wall) → скопировать.
+3. `group_id` — id сообщества (число из адреса vk.com/club12345).
+4. Панель: **Подключения → publish → vk** → `access_token` + `group_id` → Сохранить.
+
+### 7.3. Instagram Reels (Unlimited)
+1. Business/Creator-аккаунт Instagram + **страница Facebook**, связанная с ним.
+2. https://developers.facebook.com → приложение → продукт **Instagram Graph API** → подключить аккаунт.
+3. Получить долгоживущий `access_token` и `user_id` (раздел «API Setup» в приложении).
+4. **Нужен публичный адрес системы** (`server_url`, например `https://cf.example.com`) —
+   Instagram принимает только публичные URL видео.
+5. Панель: **Подключения → publish → instagram** → `access_token`, `user_id`, `server_url` → Сохранить.
 
 ---
 

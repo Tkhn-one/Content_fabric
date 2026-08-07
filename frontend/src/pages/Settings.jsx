@@ -8,11 +8,13 @@ export default function Settings() {
   const [licenseKey, setLicenseKey] = useState("");
   const [form, setForm] = useState({ provider_type: "llm", provider_name: "", label: "", payload: {}, is_default: false });
   const [msg, setMsg] = useState("");
+  const [brand, setBrand] = useState({ app_name: "", logo_url: "" });
 
   const load = () => {
     api.get("/settings/providers/catalog").then((r) => setCatalog(r.data)).catch(() => {});
     api.get("/settings/providers").then((r) => setProviders(r.data)).catch(() => {});
     api.get("/settings/license").then((r) => setLicense(r.data)).catch(() => {});
+    api.get("/settings/branding").then((r) => setBrand(r.data)).catch(() => {});
   };
   useEffect(() => { load(); }, []);
 
@@ -38,6 +40,15 @@ export default function Settings() {
       load();
     } catch (err) {
       setMsg(err.response?.data?.detail || "Ключ не подошёл");
+    }
+  };
+
+  const saveBranding = async () => {
+    try {
+      await api.put("/settings/branding", brand);
+      setMsg("Брендинг сохранён ✓");
+    } catch (err) {
+      setMsg(err.response?.data?.detail || "Ошибка");
     }
   };
 
@@ -97,6 +108,19 @@ export default function Settings() {
           {msg && <div className="error">{msg}</div>}
           <div><button type="submit" className="btn primary">Сохранить подключение</button></div>
         </form>
+      </div>
+
+      <div className="card">
+        <h2>Брендинг (white-label, Unlimited)</h2>
+        <div className="form-grid">
+          <label>Название системы
+            <input value={brand.app_name} onChange={(e) => setBrand({ ...brand, app_name: e.target.value })} placeholder="Content Factory" />
+          </label>
+          <label>Логотип (URL)
+            <input value={brand.logo_url} onChange={(e) => setBrand({ ...brand, logo_url: e.target.value })} placeholder="https://.../logo.png" />
+          </label>
+        </div>
+        <button className="btn" onClick={saveBranding}>Сохранить брендинг</button>
       </div>
 
       <div className="card">

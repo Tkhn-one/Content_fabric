@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.license import parse_license
 from app.core.security import decrypt_secrets, encrypt_secrets
-from app.models import LicenseKey, ProviderSettings, User
+from app.models import LicenseKey, ProviderSettings, SystemSetting, User
 from app.providers.registry import PROVIDERS  # справочник доступных провайдеров
 from app.schemas.settings import LicenseActivate, ProviderOut, ProviderSave
 
@@ -109,3 +109,32 @@ def activate_license(body: LicenseActivate, db: Session = Depends(get_db), user:
         row.key = body.key
     db.commit()
     return {"valid": True, "tier": info.tier, "channels": info.channels, "demo": info.demo}
+
+
+# --- White-label (брендинг) ------------------------------------------------
+def _get_setting(db: Session, key: str) -> str | None:
+    row = db.get(SystemSetting, key)
+    return row.value if row else None
+
+
+@router.get("/branding")
+def get_branding(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Публичные настройки бренда (для панели)."""
+    return {
+        "app_name": _get_setting(db, "app_name") or "Content Factory",
+        "logo_url": _get_setting(db, "logo_url") or "",
+    }
+
+
+@router.put("/branding")
+def set_branding(body: dict, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """White-label (Unlimited): смена названия и логотипа системы."""
+    for key in ("app_name", "logo_url"):
+        if key in body:
+            row = db.get(SystemSetting, key)
+            if row is None:
+                db.add(SystemSetting(key=key, value=str(body[key])))
+            else:
+                row.value = str(body[key])
+    db.commit()
+    return get_branding(db, user)

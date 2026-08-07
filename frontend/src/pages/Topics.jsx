@@ -93,6 +93,13 @@ export default function Topics() {
           <label>Видео в день
             <input type="number" min="1" max="50" value={form.videos_per_day} onChange={(e) => set("videos_per_day", +e.target.value)} />
           </label>
+          <label>Голос (voice_id, Pro: ElevenLabs/HeyGen)
+            <input value={form.voice_id || ""} onChange={(e) => set("voice_id", e.target.value || null)} placeholder="оставьте пустым — авто" />
+          </label>
+          <label>AI-аватар (avatar_id, Pro: HeyGen)
+            <input value={form.avatar_id || ""} onChange={(e) => set("avatar_id", e.target.value || null)} placeholder="оставьте пустым — фейслесс" />
+            <small className="muted">введите avatar_id из HeyGen для говорящего аватара</small>
+          </label>
         </div>
         <div className="form-row">
           <label className="check"><input type="checkbox" checked={form.enabled} onChange={(e) => set("enabled", e.target.checked)} /> Расписание активно</label>
