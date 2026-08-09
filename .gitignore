@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+dist/
+frontend/dist/
+
+# Данные и медиа (не в git)
+data/
+media/
+*.db
+*.sqlite3
+
+# Окружение и секреты
+.env
+*.pem
+
+# IDE / ОС
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+tools/keygen/public.b64
+tools/keygen/private.pem
+tools/keygen/public.b64
