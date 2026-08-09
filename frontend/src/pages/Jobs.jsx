@@ -31,6 +31,13 @@ export default function Jobs() {
   const retry = async (id) => { await api.post(`/jobs/${id}/retry`); load(); };
   const open = async (id) => api.get(`/jobs/${id}`).then((r) => setDetail(r.data)).catch(() => {});
 
+  // путь к видео может быть с / или \ (Windows) — нормализуем в URL под /media/...
+  const mediaHref = (path) => {
+    const norm = String(path).replaceAll("\\", "/");
+    const idx = norm.indexOf("media/");
+    return idx >= 0 ? `/media/${norm.slice(idx + 6)}` : `/media/${norm.split("/").filter(Boolean).slice(-3).join("/")}`;
+  };
+
   return (
     <div>
       <h1>Задания</h1>
@@ -77,7 +84,7 @@ export default function Jobs() {
           <h3>Сценарий</h3>
           <pre className="script">{detail.payload?.script || "—"}</pre>
           {detail.payload?.video_path && (
-            <p>🎬 <a href={`/media/${detail.payload.video_path.split("/").slice(-3).join("/")}`} target="_blank" rel="noreferrer">Смотреть ролик</a> ({detail.payload.video_duration} сек)</p>
+            <p>🎬 <a href={mediaHref(detail.payload.video_path)} target="_blank" rel="noreferrer">Смотреть ролик</a> ({detail.payload.video_duration} сек)</p>
           )}
           <h3>Публикации</h3>
           <ul>

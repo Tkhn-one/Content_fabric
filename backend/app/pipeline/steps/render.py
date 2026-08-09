@@ -35,6 +35,12 @@ PALETTE = [
 ]
 
 
+def _url_path(p: Path) -> str:
+    """Путь к файлу с прямыми слэшами (Windows pathlib отдаёт backslashes,
+    а фронтенд и URL ожидают /)."""
+    return str(p).replace("\\", "/")
+
+
 def _is_demo(db: Session) -> tuple[bool, str]:
     row = db.query(LicenseKey).first()
     info = parse_license(row.key if row else "")
@@ -260,7 +266,7 @@ async def _render_chat(job: Job, data: dict, job_dir: Path, db: Session, voice_p
     out_video = job_dir / "video.mp4"
     _finalize(silent, audio, ass_path, out_video)
 
-    data["video_path"] = str(out_video)
+    data["video_path"] = _url_path(out_video)
     data["video_duration"] = round(probe_duration(out_video), 1)
     data["video_note"] = f"формат: фейк-чат ({len(dialogue)} реплик), музыка: {'да' if music else 'нет'}"
     job.payload = data
@@ -335,7 +341,7 @@ async def _render_avatar(job: Job, data: dict, avatar_path: Path, job_dir: Path,
     note_parts = [f"аватар: {data.get('avatar_note', 'heygen')}", f"музыка: {'да' if music else 'нет'}"]
     if not ass_ok:
         note_parts.append("субтитры: нужен ffmpeg с libass")
-    data["video_path"] = str(out_video)
+    data["video_path"] = _url_path(out_video)
     data["video_duration"] = round(probe_duration(out_video), 1)
     data["video_note"] = ", ".join(note_parts)
     job.payload = data
@@ -418,7 +424,7 @@ async def run(db: Session, job: Job, topic: Topic) -> None:
     out_video = job_dir / "video.mp4"
     _finalize(silent, audio, ass_path, out_video)
 
-    data["video_path"] = str(out_video)
+    data["video_path"] = _url_path(out_video)
     data["video_duration"] = round(probe_duration(out_video), 1)
     note_parts = [
         f"сегментов: {len(clips)}",

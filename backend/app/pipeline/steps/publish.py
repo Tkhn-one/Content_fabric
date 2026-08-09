@@ -143,7 +143,7 @@ async def _save_to_storage(db: Session, job: Job, topic: Topic, video: Path | No
                 (job.payload or {}).get("title", ""),
                 ",".join(topic.platforms or []),
                 job.status,
-                str(video) if video else "",
+                str(video).replace("\\", "/") if video else "",
             ]
             await append_sheet_row(
                 sheet_cfg["payload"]["service_account_json"],
