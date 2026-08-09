@@ -11,6 +11,23 @@ from app.schemas.auth import LoginRequest, PasswordChange, RegisterRequest, Toke
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 bearer = HTTPBearer(auto_error=False)
 
+# простой rate-limiter: IP → [timestamps]
+_login_attempts: dict[str, list[float]] = {}
+_RATE_LIMIT = 10
+_RATE_WINDOW = 60  # сек
+
+
+def _rate_limited(ip: str) -> bool:
+    import time
+    now = time.time()
+    bucket = _login_attempts.get(ip, [])
+    bucket = [t for t in bucket if now - t < _RATE_WINDOW]
+    _login_attempts[ip] = bucket
+    if len(bucket) >= _RATE_LIMIT:
+        return True
+    bucket.append(now)
+    return False
+
 
 def _count_users(db: Session) -> int:
     return db.query(User).count()
@@ -29,7 +46,19 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+def login(body: LoginRequest, db: Session = Depends(get_db), request=Depends(lambda: None)):
+    # rate-limit по username/IP (простой in-memory)
+    from fastapi import Request
+    # получаем IP из текущего контекста, если доступен
+    try:
+        from fastapi import Request as _Req
+        # fallback: без request — не лимитируем
+        pass
+    except Exception:
+        pass
+    # лимит по username (ключ — имя)
+    if _rate_limited(body.username):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Слишком много попыток, подождите минуту")
     user = db.query(User).filter(User.username == body.username).first()
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный логин или пароль")

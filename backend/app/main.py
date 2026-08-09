@@ -54,6 +54,11 @@ def _ensure_env_file() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _ensure_env_file()
+    # защита от дефолтного секрета: если остался "change-me", заменяем на рантайм-ключ
+    if settings.secret_key == "change-me-in-production":
+        _tmp = secrets.token_urlsafe(32)
+        settings.secret_key = _tmp
+        logger.warning("CF_SECRET_KEY не задан — использован временный ключ (перезапуск инвалидирует JWT). Задайте CF_SECRET_KEY в .env!")
     init_db()
     _ensure_admin()
     settings.media_dir.mkdir(parents=True, exist_ok=True)
@@ -82,14 +87,28 @@ def _ensure_admin() -> None:
 
 app = FastAPI(title=settings.app_name, version=settings.version, lifespan=lifespan)
 
+# --- CORS: "*" с credentials запрещён браузером — исправляем ---
 if settings.cors_origins:
+    _origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    _allow_credentials = True
+    if _origins == ["*"]:
+        _allow_credentials = False  # Starlette: нельзя ["*"] + credentials=True
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[o.strip() for o in settings.cors_origins.split(",")],
-        allow_credentials=True,
+        allow_origins=_origins,
+        allow_credentials=_allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+@app.middleware("http")
+async def _security_headers(request, call_next):
+    resp = await call_next(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return resp
 
 app.include_router(auth.router)
 app.include_router(topics.router)

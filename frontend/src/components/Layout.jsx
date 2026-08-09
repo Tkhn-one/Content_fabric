@@ -6,6 +6,7 @@ export default function Layout() {
   const [user, setUser] = useState(null);
   const [license, setLicense] = useState(null);
   const [brand, setBrand] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(true);
 
   useEffect(() => {
     api.get("/auth/me").then((r) => setUser(r.data)).catch(() => {});
@@ -19,41 +20,39 @@ export default function Layout() {
   };
 
   const nav = [
-    { to: "/", label: "Дашборд", end: true },
-    { to: "/topics", label: "Темы и расписание" },
-    { to: "/jobs", label: "Задания" },
-    { to: "/log", label: "Журнал публикаций" },
-    { to: "/analytics", label: "Аналитика" },
-    { to: "/settings", label: "Подключения и API" },
+    { to: "/", label: "Дашборд", end: true, icon: "📊" },
+    { to: "/topics", label: "Темы и расписание", icon: "🎯" },
+    { to: "/jobs", label: "Задания", icon: "🎬" },
+    { to: "/log", label: "Журнал", icon: "📜" },
+    { to: "/analytics", label: "Аналитика", icon: "📈" },
+    { to: "/settings", label: "Подключения", icon: "🔌" },
   ];
 
   return (
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">
-          {brand?.logo_url ? <img src={brand.logo_url} alt="" style={{ height: "22px", verticalAlign: "middle", marginRight: "6px" }} /> : "🎬"}
-          {" "}{brand?.app_name || "Content Factory"}
+          <div className="brand-logo">🎬</div>
+          <span>{brand?.app_name || "Content Factory"}</span>
+          <button className="burger" onClick={() => setMenuOpen(!menuOpen)} style={{ marginLeft: "auto" }}>{menuOpen ? "✕" : "☰"}</button>
         </div>
-        <nav>
-          {nav.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className="nav-link">
-              {n.label}
-            </NavLink>
-          ))}
-        </nav>
+        {(menuOpen || window.innerWidth > 860) && (
+          <nav>
+            {nav.map((n) => (
+              <NavLink key={n.to} to={n.to} end={n.end} className="nav-link">
+                <span>{n.icon}</span> {n.label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
         <div className="sidebar-bottom">
           <div className="license-badge">
             {license ? (
-              license.demo ? (
-                <span title="Демо-режим: водяной знак, до 3 роликов">ДЕМО-РЕЖИМ</span>
-              ) : (
-                <span title="Лицензия активна">
-                  {license.tier.toUpperCase()} · {license.channels} кан.
-                </span>
-              )
+              license.demo ? <span title="Демо: до 3 роликов с водяным знаком">ДЕМО · 3/∞</span>
+                : <span>{license.tier.toUpperCase()} · {license.channels} кан.</span>
             ) : null}
           </div>
-          {user && <div className="user">{user.username} · <button className="link" onClick={logout}>выйти</button></div>}
+          {user && <div className="user"><span>👤 {user.username}</span><button className="link" onClick={logout}>выйти</button></div>}
         </div>
       </aside>
       <main className="content">

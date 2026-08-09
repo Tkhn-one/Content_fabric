@@ -89,7 +89,17 @@ export default function Topics() {
           </label>
           <label>Cron-расписание
             <input value={form.schedule_cron} onChange={(e) => set("schedule_cron", e.target.value)} placeholder="0 9,18 * * *" />
-            <small className="muted">пример: 0 9,18 * * * = в 09:00 и 18:00 ежедневно</small>
+            <div className="cron-presets">
+              {[
+                ["09:00 ежедневно","0 9 * * *"],
+                ["09:00 и 18:00","0 9,18 * * *"],
+                ["каждые 6 часов","0 */6 * * *"],
+                ["каждый час","0 * * * *"],
+                ["пн-пт 10:00","0 10 * * 1-5"],
+              ].map(([label,cron])=>(
+                <button key={cron} type="button" onClick={()=>set("schedule_cron", cron)}>{label}</button>
+              ))}
+            </div>
           </label>
           <label>Видео в день
             <input type="number" min="1" max="50" value={form.videos_per_day} onChange={(e) => set("videos_per_day", +e.target.value)} />

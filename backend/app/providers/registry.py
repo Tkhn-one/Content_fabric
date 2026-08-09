@@ -86,11 +86,6 @@ PROVIDERS: list[tuple[str, str, dict]] = [
          "fields": ["access_token", "user_id", "server_url"]},
     ),
     (
-        "avatar", "heygen",
-        {"description": "HeyGen: AI-аватар, читающий сценарий (Pro+)", "url": "heygen.com",
-         "free": False, "fields": ["api_key", "avatar_id", "voice_id"]},
-    ),
-    (
         "storage", "google_sheets",
         {"description": "Журнал публикаций в Google Sheets (service account)",
          "url": "console.cloud.google.com", "free": True,
