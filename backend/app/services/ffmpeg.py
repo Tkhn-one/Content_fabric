@@ -35,6 +35,16 @@ def ffmpeg_available() -> bool:
         return False
 
 
+def ffmpeg_has_filter(name: str) -> bool:
+    """Есть ли у текущего ffmpeg нужный фильтр (например, 'ass')."""
+    try:
+        exe = ffmpeg_path()
+        res = subprocess.run([exe, "-hide_banner", "-filters"], capture_output=True, text=True, timeout=30)
+        return name in (res.stdout or "")
+    except Exception:
+        return False
+
+
 def probe_duration(path: str | Path) -> float:
     """Длительность аудио/видео в секундах (ffprobe или ffmpeg -i)."""
     path = str(path)

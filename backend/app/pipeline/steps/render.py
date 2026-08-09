@@ -19,7 +19,7 @@ from app.core.config import settings
 from app.core.license import parse_license
 from app.models import Job, LicenseKey, Topic
 from app.providers.registry import get_provider_settings
-from app.services.ffmpeg import ffmpeg_available, ffmpeg_path, probe_duration
+from app.services.ffmpeg import ffmpeg_available, ffmpeg_has_filter, ffmpeg_path, probe_duration
 from app.services.subtitles import build_ass, Word
 from app.services.wordtimings import estimate_word_timings, group_words_by_phrases, split_phrases
 
@@ -163,11 +163,14 @@ def _mix_audio(voice: Path | None, music: Path | None, duration: float, out: Pat
         raise RuntimeError(f"ffmpeg audio: {res.stderr[-400:]}")
 
 
-def _finalize(video: Path, audio: Path, ass_path: Path, out: Path) -> None:
+def _finalize(video: Path, audio: Path, ass_path: Path | None, out: Path) -> None:
     exe = ffmpeg_path()
     cmd = [
         exe, "-y", "-i", str(video), "-i", str(audio),
-        "-vf", f"ass={ass_path}",
+    ]
+    if ass_path is not None and ass_path.exists():
+        cmd += ["-vf", f"ass={ass_path}"]
+    cmd += [
         "-map", "0:v", "-map", "1:a",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-c:a", "aac", "-b:a", "192k", "-shortest",
@@ -178,7 +181,7 @@ def _finalize(video: Path, audio: Path, ass_path: Path, out: Path) -> None:
         raise RuntimeError(f"ffmpeg finalize: {res.stderr[-500:]}")
 
 
-async def _render_chat(job: Job, data: dict, job_dir: Path, db: Session, voice_path: Path | None) -> None:
+async def _render_chat(job: Job, data: dict, job_dir: Path, db: Session, voice_path: Path | None, ass_ok: bool = True) -> None:
     """Фейк-чат: каждый кадр — скриншот мессенджера с накопленными сообщениями.
 
     Длительность кадра = длительность озвучки реплики (из dialogue_timings).
@@ -235,11 +238,14 @@ async def _render_chat(job: Job, data: dict, job_dir: Path, db: Session, voice_p
     audio = job_dir / "audio.m4a"
     _mix_audio(voice_path, music, total, audio)
 
-    # субтитры не нужны (текст на экране); водяной знак — стилем Watermark
+    # субтитры не нужны (текст на экране); водяной знак — уже в скриншоте,
+    # доп. слой Watermark — только если есть libass
     from app.services.subtitles import build_ass
 
-    ass_path = job_dir / "subs.ass"
-    ass_path.write_text(build_ass([], total, watermark=watermark if demo else None), encoding="utf-8")
+    ass_path = None
+    if ass_ok:
+        ass_path = job_dir / "subs.ass"
+        ass_path.write_text(build_ass([], total, watermark=watermark if demo else None), encoding="utf-8")
 
     out_video = job_dir / "video.mp4"
     _finalize(silent, audio, ass_path, out_video)
@@ -261,7 +267,7 @@ def _pick_music() -> Path | None:
     return random.choice(tracks)
 
 
-async def _render_avatar(job: Job, data: dict, avatar_path: Path, job_dir: Path, db: Session) -> None:
+async def _render_avatar(job: Job, data: dict, avatar_path: Path, job_dir: Path, db: Session, ass_ok: bool = True) -> None:
     """Режим аватара: видео аватара 9:16 + субтитры + музыка с ducking + водяной знак."""
     script = data.get("script", "")
     exe = ffmpeg_path()
@@ -309,15 +315,19 @@ async def _render_avatar(job: Job, data: dict, avatar_path: Path, job_dir: Path,
 
     # 5) субтитры + водяной знак
     demo, watermark = _is_demo(db)
-    ass_path = job_dir / "subs.ass"
-    ass_path.write_text(build_ass(grouped, total, watermark=watermark if demo else None), encoding="utf-8")
+    ass_path = job_dir / "subs.ass" if ass_ok else None
+    if ass_path:
+        ass_path.write_text(build_ass(grouped, total, watermark=watermark if demo else None), encoding="utf-8")
 
     out_video = job_dir / "video.mp4"
     _finalize(base, audio, ass_path, out_video)
 
+    note_parts = [f"аватар: {data.get('avatar_note', 'heygen')}", f"музыка: {'да' if music else 'нет'}"]
+    if not ass_ok:
+        note_parts.append("субтитры: нужен ffmpeg с libass")
     data["video_path"] = str(out_video)
     data["video_duration"] = round(probe_duration(out_video), 1)
-    data["video_note"] = f"аватар: {data.get('avatar_note', 'heygen')}, музыка: {'да' if music else 'нет'}"
+    data["video_note"] = ", ".join(note_parts)
     job.payload = data
     db.commit()
 
@@ -338,17 +348,23 @@ async def run(db: Session, job: Job, topic: Topic) -> None:
     job_dir = settings.media_dir / "jobs" / str(job.id)
     job_dir.mkdir(parents=True, exist_ok=True)
 
+    # --- есть ли libass (субтитры)? на Windows imageio-ffmpeg может быть без него ---
+    ass_ok = ffmpeg_has_filter("ass")
+    if not ass_ok:
+        logger.warning("ffmpeg без libass — субтитры/водяной знак будут пропущены")
+    data["ass_filter"] = ass_ok
+
     # --- тайминги слов ---
     words: list[Word] = [Word(w["text"], w["start"], w["end"]) for w in data.get("word_timings", [])]
     voice_path = Path(data["voice_path"]) if data.get("voice_path") else None
     avatar_path = Path(data["avatar_path"]) if data.get("avatar_path") else None
 
     if avatar_path and avatar_path.exists():
-        return await _render_avatar(job, data, avatar_path, job_dir, db)
+        return await _render_avatar(job, data, avatar_path, job_dir, db, ass_ok)
 
     # формат «фейк-чат»: скриншоты мессенджера вместо фоновых сегментов
     if data.get("dialogue"):
-        return await _render_chat(job, data, job_dir, db, voice_path)
+        return await _render_chat(job, data, job_dir, db, voice_path, ass_ok)
 
     if not words:
         dur = probe_duration(voice_path) if voice_path else max(8.0, len(script) / 13.0)
@@ -385,17 +401,22 @@ async def run(db: Session, job: Job, topic: Topic) -> None:
 
     # --- субтитры + водяной знак ---
     demo, watermark = _is_demo(db)
-    ass_path = job_dir / "subs.ass"
-    ass_path.write_text(build_ass(grouped, total, watermark=watermark if demo else None), encoding="utf-8")
+    ass_path = job_dir / "subs.ass" if ass_ok else None
+    if ass_path:
+        ass_path.write_text(build_ass(grouped, total, watermark=watermark if demo else None), encoding="utf-8")
 
     out_video = job_dir / "video.mp4"
     _finalize(silent, audio, ass_path, out_video)
 
     data["video_path"] = str(out_video)
     data["video_duration"] = round(probe_duration(out_video), 1)
-    data["video_note"] = (
-        f"сегментов: {len(clips)}, музыка: {'да' if music else 'нет'}, "
-        f"фон: {'pexels' if used_stock else 'градиент'}"
-    )
+    note_parts = [
+        f"сегментов: {len(clips)}",
+        f"музыка: {'да' if music else 'нет'}",
+        f"фон: {'pexels' if used_stock else 'градиент'}",
+    ]
+    if not ass_ok:
+        note_parts.append("субтитры: нужен ffmpeg с libass (winget install Gyan.FFmpeg)")
+    data["video_note"] = ", ".join(note_parts)
     job.payload = data
     db.commit()

@@ -5,13 +5,18 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1280, 720
-FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 PALETTES = [
     ((30, 27, 75), (76, 29, 149)),
     ((12, 74, 110), (190, 24, 93)),
     ((16, 23, 42), (30, 58, 138)),
     ((59, 7, 100), (134, 25, 143)),
 ]
+
+
+def _font(size: int) -> ImageFont.FreeTypeFont:
+    from app.services.fonts import find_font
+
+    return ImageFont.truetype(find_font(), size)
 
 
 def generate_cover(title: str, niche: str, out_path: str | Path, brand: str = "Content Factory", seed: int = 0) -> Path:
@@ -26,7 +31,7 @@ def generate_cover(title: str, niche: str, out_path: str | Path, brand: str = "C
         d.line([(0, y), (W, y)], fill=color)
 
     # заголовок (2-3 строки)
-    font_title = ImageFont.truetype(FONT_PATH, 72)
+    font_title = _font(72)
     lines = textwrap.wrap(title, 26) or [title]
     if len(lines) > 3:
         lines = lines[:3]
@@ -38,7 +43,7 @@ def generate_cover(title: str, niche: str, out_path: str | Path, brand: str = "C
         y += 100
 
     # ниша-бейдж
-    font_badge = ImageFont.truetype(FONT_PATH, 40)
+    font_badge = _font(40)
     bbox = d.textbbox((0, 0), niche, font=font_badge)
     bw = bbox[2] - bbox[0] + 48
     bx = (W - bw) // 2
@@ -46,7 +51,7 @@ def generate_cover(title: str, niche: str, out_path: str | Path, brand: str = "C
     d.text((bx + 24, y + 55), niche, font=font_badge, fill=(255, 255, 255))
 
     # бренд внизу
-    font_brand = ImageFont.truetype(FONT_PATH, 32)
+    font_brand = _font(32)
     d.text((40, H - 60), brand, font=font_brand, fill=(255, 255, 255, 140))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

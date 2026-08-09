@@ -21,11 +21,12 @@ MUTED = (140, 150, 160)
 ACCENT = (110, 200, 255)
 
 MAX_VISIBLE = 8          # сколько сообщений помещается на экране
-FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
 
 def _font(size: int) -> ImageFont.FreeTypeFont:
-    return ImageFont.truetype(FONT_PATH, size)
+    from app.services.fonts import find_font
+
+    return ImageFont.truetype(find_font(), size)
 
 
 def _fit_text(text: str, max_chars: int = 42, max_lines: int = 6) -> str:

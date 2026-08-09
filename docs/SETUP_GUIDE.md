@@ -102,31 +102,46 @@ docker cp <container>:/tmp/cf_data.tar.gz ./cf_data_backup.tar.gz
 
 ### 1.5. Вариант Б — запуск без Docker (локально / dev)
 
-Подходит для тестов на своём ПК (Linux, macOS, Windows):
+Подходит для тестов на своём ПК (Windows, Linux, macOS).
+
+> **Windows-пользователям:** веб-панель уже собрана и лежит в репозитории
+> (`frontend/dist/`) — **Node.js / npm устанавливать НЕ нужно**. Установка сводится
+> к Python + запуску двух команд (см. ниже).
 
 ```bash
-# 1) Python 3.11+ и ffmpeg
-#    Ubuntu:  sudo apt install python3-venv ffmpeg fonts-dejavu-core
-#    Windows:  установить Python с python.org, ffmpeg — winget install ffmpeg
+# 1) Установите Python 3.11+ (https://python.org) и ffmpeg
+#    Windows:  winget install Gyan.FFmpeg        (обязательно: без него не будет субтитров)
+#    Linux:    sudo apt install ffmpeg fonts-dejavu-core
 
 # 2) Серверная часть
 cd backend
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt   # Windows: .venv\Scripts\pip install -r requirements.txt
+python -m venv .venv
+#    Windows:  .venv\Scripts\pip install -r requirements.txt
+#    Linux:    .venv/bin/pip install -r requirements.txt
 
-# 3) Собрать веб-панель (один раз)
-cd ../frontend
-npm install
-npm run build          # появится frontend/dist — сервер отдаёт её сам
-
-# 4) Запустить
-cd ../backend
+# 3) Запустить
+#    Windows (CMD):
+set CF_SECRET_KEY=dev-secret
+.venv\Scripts\uvicorn app.main:app --host 0.0.0.0 --port 8000
+#    Windows (PowerShell):
+$env:CF_SECRET_KEY="dev-secret"
+.venv\Scripts\uvicorn app.main:app --host 0.0.0.0 --port 8000
+#    Linux / macOS:
 CF_SECRET_KEY=dev-secret ../.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
-# → http://localhost:8000 → admin / admin123 (или ваш CF_ADMIN_PASSWORD)
+
+# 4) Откройте в браузере: http://localhost:8000 → admin / admin123
 ```
 
-> Для разработки панели с горячей перезагрузкой: в `frontend/` запустите `npm run dev`
-> (Vite на порту 5173, сам проксирует запросы к API на 8000).
+> **Если хотите пересобрать панель сами** (для разработки): установите Node 18+
+> (https://nodejs.org), затем в папке `frontend/`: `npm install` → `npm run build`.
+> Для горячей перезагрузки при разработке: `npm run dev` (Vite на порту 5173,
+> сам проксирует запросы к API на 8000).
+
+> **Почему на Windows нужен свой ffmpeg:** встроенный (imageio-ffmpeg) собран без
+> поддержки субтитров (libass). Системный ffmpeg (Gyan) с libass — и субтитры,
+> и водяной знак работают. Без него ролик всё равно соберётся, но без субтитров
+> (в деталях задания появится примечание). Шрифты система находит сама
+> (Windows/Linux/macOS).
 
 ### 1.6. Первый вход и проверка (5 мин)
 
