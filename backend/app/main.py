@@ -1,5 +1,7 @@
 """Точка входа: FastAPI-приложение, lifespan, роутеры, статика SPA."""
 import logging
+import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -21,8 +23,37 @@ logger = logging.getLogger(__name__)
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
+def _ensure_env_file() -> None:
+    """Вариант Б (запуск без Docker): при первом старте создаёт .env с конфигом.
+
+    Не создаёт .env, если конфигурация задана явно (Docker через compose
+    или переменные окружения) или файл уже существует.
+    """
+    if os.environ.get("CF_DB_URL"):
+        return  # Docker / явная конфигурация — .env не нужен
+    env_path = Path(".env")
+    if env_path.exists():
+        return
+    secret = secrets.token_urlsafe(32)
+    env_path.write_text(
+        "# Content Factory — локальный конфиг (создан автоматически при первом запуске)\n"
+        "# Смените пароль в панели (Настройки → Безопасность) или здесь.\n"
+        f"CF_SECRET_KEY={secret}\n"
+        "CF_ADMIN_USERNAME=admin\n"
+        "CF_ADMIN_PASSWORD=admin123\n"
+        "CF_LICENSE_REQUIRED=false\n"
+        "CF_DEMO_MODE=true\n",
+        encoding="utf-8",
+    )
+    # чтобы первый запуск сразу использовал нормальный ключ (без предупреждения в логе)
+    if not os.environ.get("CF_SECRET_KEY"):
+        settings.secret_key = secret
+    logger.info("Создан файл .env с конфигурацией по умолчанию (логин: admin / admin123). Смените пароль!")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _ensure_env_file()
     init_db()
     _ensure_admin()
     settings.media_dir.mkdir(parents=True, exist_ok=True)

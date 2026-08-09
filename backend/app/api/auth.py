@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import create_access_token, decode_token, hash_password, verify_password
 from app.models import User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserOut
+from app.schemas.auth import LoginRequest, PasswordChange, RegisterRequest, TokenResponse, UserOut
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 bearer = HTTPBearer(auto_error=False)
@@ -49,4 +49,27 @@ def me(
     user = db.get(User, int(payload["sub"]))
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Пользователь не найден")
+    return UserOut.model_validate(user)
+
+
+@router.post("/password", response_model=UserOut)
+def change_password(
+    body: PasswordChange,
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
+    db: Session = Depends(get_db),
+):
+    """Смена пароля текущего пользователя (важно: пароль по умолчанию admin123 — смените!)."""
+    if creds is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Требуется авторизация")
+    payload = decode_token(creds.credentials)
+    if not payload:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Невалидный токен")
+    user = db.get(User, int(payload["sub"]))
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Пользователь не найден")
+    if not verify_password(body.old_password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Старый пароль неверный")
+    user.password_hash = hash_password(body.new_password)
+    db.commit()
+    db.refresh(user)
     return UserOut.model_validate(user)

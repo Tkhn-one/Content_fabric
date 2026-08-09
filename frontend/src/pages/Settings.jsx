@@ -11,6 +11,8 @@ export default function Settings() {
   const [brand, setBrand] = useState({ app_name: "", logo_url: "" });
   const [reseller, setReseller] = useState({ tier: "pro", channels: 1, customer: "", support_until: "" });
   const [resellerKey, setResellerKey] = useState("");
+  const [pwd, setPwd] = useState({ old_password: "", new_password: "", confirm: "" });
+  const [pwdMsg, setPwdMsg] = useState("");
 
   const load = () => {
     api.get("/settings/providers/catalog").then((r) => setCatalog(r.data)).catch(() => {});
@@ -62,6 +64,21 @@ export default function Settings() {
       setMsg(`Ключ выпущен (${data.payload.tier}, каналов: ${data.payload.channels}) ✓`);
     } catch (err) {
       setMsg(err.response?.data?.detail || "Ошибка генерации ключа");
+    }
+  };
+
+  const changePassword = async () => {
+    setPwdMsg("");
+    if (pwd.new_password !== pwd.confirm) {
+      setPwdMsg("Пароли не совпадают");
+      return;
+    }
+    try {
+      await api.post("/auth/password", { old_password: pwd.old_password, new_password: pwd.new_password });
+      setPwd({ old_password: "", new_password: "", confirm: "" });
+      setPwdMsg("Пароль изменён ✓");
+    } catch (err) {
+      setPwdMsg(err.response?.data?.detail || "Ошибка смены пароля");
     }
   };
 
@@ -151,6 +168,24 @@ export default function Settings() {
             <button className="btn small" onClick={() => { navigator.clipboard?.writeText(resellerKey); setMsg("Ключ скопирован ✓"); }}>Копировать</button>
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <h2>Безопасность</h2>
+        <p className="muted small">Пароль по умолчанию (admin123) — из примера. Обязательно смените его на свой.</p>
+        <div className="form-grid">
+          <label>Текущий пароль
+            <input type="password" value={pwd.old_password} onChange={(e) => setPwd({ ...pwd, old_password: e.target.value })} />
+          </label>
+          <label>Новый пароль
+            <input type="password" value={pwd.new_password} onChange={(e) => setPwd({ ...pwd, new_password: e.target.value })} />
+          </label>
+          <label>Повторите новый пароль
+            <input type="password" value={pwd.confirm} onChange={(e) => setPwd({ ...pwd, confirm: e.target.value })} />
+          </label>
+        </div>
+        {pwdMsg && <div className="error">{pwdMsg}</div>}
+        <button className="btn primary" onClick={changePassword}>Сменить пароль</button>
       </div>
 
       <div className="card">
