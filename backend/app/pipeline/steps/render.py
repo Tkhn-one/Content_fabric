@@ -170,21 +170,23 @@ def _mix_audio(voice: Path | None, music: Path | None, duration: float, out: Pat
 
 
 def _finalize(video: Path, audio: Path, ass_path: Path | None, out: Path) -> None:
+    """Финальная сборка: видео + аудио + субтитры.
+
+    Windows-совместимость: запускаем ffmpeg с cwd=папка задания и передаём
+    ОТНОСИТЕЛЬНЫЕ имена файлов — так в аргументах не появляются двоеточие
+    диска (C:) и кириллица, которые ломают парсер фильтра ass=.
+    """
     exe = ffmpeg_path()
-    cmd = [
-        exe, "-y", "-i", str(video), "-i", str(audio),
-    ]
+    cmd = [exe, "-y", "-i", video.name, "-i", audio.name]
     if ass_path is not None and ass_path.exists():
-        # Windows: в фильтре ass= путь должен быть с прямыми слэшами
-        ass_fp = str(ass_path.resolve()).replace("\\", "/")
-        cmd += ["-vf", f"ass='{ass_fp}'"]
+        cmd += ["-vf", f"ass={ass_path.name}"]
     cmd += [
         "-map", "0:v", "-map", "1:a",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-c:a", "aac", "-b:a", "192k", "-shortest",
-        str(out),
+        out.name,
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=600, cwd=str(out.parent))
     if res.returncode != 0:
         raise RuntimeError(f"ffmpeg finalize: {res.stderr[-500:]}")
 
