@@ -119,12 +119,18 @@ def _segment_clip(bg: Path, dur: float, out: Path) -> None:
 
 
 def _concat_segments(clips: list[Path], out: Path) -> None:
+    """Склейка сегментов через concat demuxer.
+
+    Windows-совместимость: в concat.txt пишем только ИМЕНА файлов (без путей)
+    и запускаем ffmpeg с cwd=папка сегментов — так не ломаются обратные слэши
+    и кириллица в путях.
+    """
     list_file = out.parent / "concat.txt"
-    list_file.write_text("".join(f"file '{c.resolve()}'\n" for c in clips))
+    list_file.write_text("".join(f"file '{c.name}'\n" for c in clips), encoding="utf-8")
     exe = ffmpeg_path()
     res = subprocess.run(
-        [exe, "-y", "-f", "concat", "-safe", "0", "-i", str(list_file), "-c", "copy", str(out)],
-        capture_output=True, text=True, timeout=300,
+        [exe, "-y", "-f", "concat", "-safe", "0", "-i", "concat.txt", "-c", "copy", out.name],
+        capture_output=True, text=True, timeout=300, cwd=str(out.parent),
     )
     if res.returncode != 0:
         raise RuntimeError(f"ffmpeg concat: {res.stderr[-400:]}")
@@ -169,7 +175,9 @@ def _finalize(video: Path, audio: Path, ass_path: Path | None, out: Path) -> Non
         exe, "-y", "-i", str(video), "-i", str(audio),
     ]
     if ass_path is not None and ass_path.exists():
-        cmd += ["-vf", f"ass={ass_path}"]
+        # Windows: в фильтре ass= путь должен быть с прямыми слэшами
+        ass_fp = str(ass_path.resolve()).replace("\\", "/")
+        cmd += ["-vf", f"ass='{ass_fp}'"]
     cmd += [
         "-map", "0:v", "-map", "1:a",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
